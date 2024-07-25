@@ -1,6 +1,8 @@
 import plotly.graph_objects as go
+import os
 import networkx as nx
 import numpy as np
+import plotly.io as pio
 
 from PyARMViz import Rule
 
@@ -11,7 +13,7 @@ import logging
 
 import math
 
-def metadata_scatter_plot(rules:List, allow_compound_flag:bool=False):
+def metadata_scatter_plot(ujpath, kvtnev, rules:List, allow_compound_flag:bool=False):
     '''
     Visualizes the distribution of Association Rule Confidence, Support and Lift in the form of a
     Plotly scatterplot
@@ -20,7 +22,9 @@ def metadata_scatter_plot(rules:List, allow_compound_flag:bool=False):
     confidence_list = []
     lift_list = []
     support_list = []
-    
+    marksize = []
+    marktext = []
+
     for rule in rules:
         #Discard compound rules (either pre or antecedents) if indicated 
         if allow_compound_flag == False:
@@ -32,6 +36,8 @@ def metadata_scatter_plot(rules:List, allow_compound_flag:bool=False):
         support_list.append(rule.support)
         hover_text = "{} => {}, Lift: {}".format(rule.lhs, rule.rhs, rule.lift)
         id_list.append(hover_text)
+        marksize.append(20*(rule.lift))
+        marktext.append("{} => {}".format(rule.lhs, rule.rhs))
         
     colorbar=dict(
         tick0=0,
@@ -39,12 +45,16 @@ def metadata_scatter_plot(rules:List, allow_compound_flag:bool=False):
     )
     
     
-    fig = go.Figure(data=go.Scatter(x=support_list, y=confidence_list, text = id_list, mode='markers', marker={'color': lift_list, 'colorscale': "purp", 'colorbar':{'title': 'Lift'}},))
+    fig = go.Figure(data=go.Scatter(x=support_list, y=confidence_list, text=marktext,  mode="markers+text", marker={'size':marksize,'color': lift_list,  'colorscale': "purp", 'colorbar':{'title': 'Lift'}},))
     fig.update_layout(title="Association Rules Strength Distribution", xaxis_title="Support", yaxis_title="Confidence", xaxis={'autorange':'reversed'},)
+    fig.update_layout(height=math.pow(len(confidence_list), 1)*10-0)
     fig.show()
+    os.chdir(ujpath)
+    temp = kvtnev+"_pyARMviz_meta_scat.html"
+    pio.write_html(fig, temp)
     return fig
 
-def adjacency_parallel_category_plot(rules:List):
+def adjacency_parallel_category_plot(ujpath, kvtnev, rules:List):
     '''
         Visualizes the antecedents and consequents of each association rules by drawing lines
         representing each rule across identical vertical axes representing the potential items
@@ -86,10 +96,13 @@ def adjacency_parallel_category_plot(rules:List):
             paper_bgcolor = 'white'
         )
 
-        fig.show()    
+        fig.show()
+        os.chdir(ujpath)
+        temp = kvtnev+"_pyARMviz_adj_paral_categ_"+str(axis_counter)+".html"
+        pio.write_html(fig, temp)    
         axis_counter += 1    
     
-def adjacency_parallel_coordinate_plot(rules:List):
+def adjacency_parallel_coordinate_plot(ujpath, kvtnev, rules:List):
     '''
         Visualizes the antecedents and consequents of each rule by drawing lines
         representing each rule across identical vertical axis representing the
@@ -141,7 +154,10 @@ def adjacency_parallel_coordinate_plot(rules:List):
             paper_bgcolor = 'white'
         )
 
-        fig.show()    
+        fig.show()   
+        os.chdir(ujpath)
+        temp = kvtnev+"_pyARMviz_adj_paral_coord_"+str(axis_counter)+".html"
+        pio.write_html(fig, temp) 
         axis_counter += 1
 
 def _parallel_coord_axis_optimizer(rules:List, unique_entities:List, axis_count:int):
@@ -292,7 +308,7 @@ def _parallel_category_builder(rules:List, axis_count:int):
     
     return axis_objects
 
-def adjacency_graph_plotly(rules:Rule):
+def adjacency_graph_plotly(ujpath, kvtnev, rules:Rule):
     '''
         This is the plotly version of the 
     '''
@@ -328,6 +344,12 @@ def adjacency_graph_plotly(rules:Rule):
         node_y.append(y)
         node_text.append(node)
 
+    node_adjacencies = []
+    node_text = []
+    for node, adjacencies in enumerate(graph.adjacency()):
+        node_adjacencies.append(len(adjacencies[1]))
+        node_text.append('Node:'+str(node)+', # of connections: '+str(len(adjacencies[1])))
+
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
@@ -342,17 +364,19 @@ def adjacency_graph_plotly(rules:Rule):
             #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
             colorscale='YlGnBu',
             reversescale=True,
-            color=[],
-            size=10,
+            color=node_adjacencies,
+            size=7,
             colorbar=dict(
                 thickness=15,
                 title='Node Connections',
                 xanchor='left',
                 titleside='right'
             ),
-            line_width=2))
+            line_width=1))
+
     fig = go.Figure(data=[edge_trace, node_trace],
-         layout=go.Layout(
+        #marker={'size':marksize,'color': lift_list,  'colorscale': "purp", 'colorbar':{'title': 'Lift'}}
+        layout=go.Layout(
             title='<br>Network graph made with Python',
             titlefont_size=16,
             showlegend=False,
@@ -367,6 +391,9 @@ def adjacency_graph_plotly(rules:Rule):
             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
             )
     fig.show()
+    os.chdir(ujpath)
+    temp = kvtnev+"_pyARMviz_adj_graph.html"
+    pio.write_html(fig, temp)
 
 def adjacency_graph_gephi(rules:List[Rule], output_path:str=None):
     '''
@@ -406,7 +433,7 @@ def _adjacency_graph_generator(rules:List[Rule]):
     
 
 
-def adjacency_scatter_plot(rules:List[Rule], notebook_flag:bool = False):
+def adjacency_scatter_plot(ujpath, kvtnev, rules:List[Rule], notebook_flag:bool = False):
     '''
     Generates a plot showing the distribution of association rules in terms of association
     rules between antecedent and consequent entities, support and confidence
@@ -423,6 +450,7 @@ def adjacency_scatter_plot(rules:List[Rule], notebook_flag:bool = False):
         strength.append(20 * rule.confidence)
         unique_values.add(str(rule.rhs))
         unique_values.add(str(rule.lhs))
+
         
     #Generate distance matrix view
     fig = go.Figure()
@@ -434,6 +462,9 @@ def adjacency_scatter_plot(rules:List[Rule], notebook_flag:bool = False):
         marker = {'size':strength},
         name='Association rules',
     ))
-    
+    fig.update_layout(height=math.pow(len(rules), 1)*3.1-50)
     fig.show()
+    os.chdir(ujpath)
+    temp = kvtnev+"_pyARMviz_adj_scat.html"
+    pio.write_html(fig, temp)
     return fig
